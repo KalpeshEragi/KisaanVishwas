@@ -1,5 +1,6 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
+// This is the NEW, correct ES Module syntax
+import { expect } from "chai";
+import { ethers } from "hardhat";
 
 // Describe the test suite for the SupplyChain contract
 describe("SupplyChain", function () {
