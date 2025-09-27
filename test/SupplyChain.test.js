@@ -1,6 +1,7 @@
 // This is the NEW, correct ES Module syntax
 import { expect } from "chai";
-import { ethers } from "hardhat";
+import hardhat from "hardhat";
+const ethers = hardhat;// Destructure ethers from the package
 
 // Describe the test suite for the SupplyChain contract
 describe("SupplyChain", function () {
