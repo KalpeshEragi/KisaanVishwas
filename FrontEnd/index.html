@@ -5,8 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KisaanVishwas - Supply Chain Tracker</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Ethers.js library for blockchain interaction -->
-    <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js" type="application/javascript"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js" xintegrity="sha512-FDcVY+g7vcNsSifNf5swieyS7LqwM1CkIcpIssO/5S2NE6eRTK3T0SmyxULlLdAb1a2y2TxyrrK52yd2lMCHWA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -104,13 +103,23 @@
                             <label for="qualityMetrics" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Quality Metrics</label>
                             <input type="text" id="qualityMetrics" required placeholder="e.g., Grade A, Organic" class="mt-1 block w-full bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500">
                         </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="quantity" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Quantity (kg)</label>
+                                <input type="number" id="quantity" required class="mt-1 block w-full bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500">
+                            </div>
+                            <div>
+                                <label for="pricePerUnit" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Price/kg (₹)</label>
+                                <input type="number" id="pricePerUnit" required class="mt-1 block w-full bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500">
+                            </div>
+                        </div>
                         <button type="submit" class="w-full bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition duration-300">Create New Batch</button>
                     </form>
                 </div>
 
                 <!-- Stakeholder Actions -->
                 <div id="stakeholder-actions" class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md hidden">
-                    <h2 class="text-2xl font-bold mb-4 border-b-2 border-blue-500 pb-2">Stakeholder Dashboard</h2>
+                    <h2 class="text-2xl font-bold mb-4 border-b-2 border-blue-500 pb-2">Manage Batch</h2>
                     <form id="transfer-form" class="space-y-4">
                          <div>
                             <label for="transferBatchId" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Batch ID</label>
@@ -119,6 +128,10 @@
                         <div>
                             <label for="newOwner" class="block text-sm font-medium text-gray-700 dark:text-gray-300">New Owner Address</label>
                             <input type="text" id="newOwner" required class="mt-1 block w-full bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label for="transferPrice" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Sale Price/kg (₹)</label>
+                            <input type="number" id="transferPrice" required class="mt-1 block w-full bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
                         </div>
                         <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-300">Transfer Ownership</button>
                     </form>
@@ -137,7 +150,7 @@
                     <div id="trace-results" class="mt-6 hidden">
                         <h3 class="text-xl font-semibold mb-2">Batch Details</h3>
                         <div id="batch-details" class="bg-gray-50 dark:bg-gray-700 p-4 rounded-md text-sm mb-4"></div>
-                        <h3 class="text-xl font-semibold mb-2">Chain of Custody</h3>
+                        <h3 class="text-xl font-semibold mb-2">Price Progression / Journey</h3>
                         <div id="batch-history" class="space-y-2"></div>
                     </div>
                 </div>
@@ -164,401 +177,291 @@
 
     <script>
         // --- CONFIGURATION --- //
-        // 1. PASTE YOUR DEPLOYED CONTRACT ADDRESS HERE (retrieve from deployment)
-        // const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
-        const contractAddress = 0x5FbDB2315678afecb367f032d93F642f64180aa3
+        // 1. PASTE YOUR NEW DEPLOYED CONTRACT ADDRESS HERE
+        const contractAddress = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"; 
 
-        // 2. PASTE YOUR CONTRACT'S ABI (from artifacts/contracts/SupplyChain.sol/SupplyChain.json) HERE
-        const contractABI = {
-    "_format": "hh-sol-artifact-1",
-    "contractName": "SupplyChain",
-    "sourceName": "contracts/SupplyChain.sol",
-    "abi": [
+        // 2. PASTE YOUR NEW CONTRACT'S ABI HERE (Just the array, not the whole file)
+        const contractABI = [
+    {
+      "anonymous": false,
+      "inputs": [
         {
-        "anonymous": false,
-        "inputs": [
-            {
-            "indexed": true,
-            "internalType": "uint256",
-            "name": "batchId",
-            "type": "uint256"
-            },
-            {
-            "indexed": true,
-            "internalType": "address",
-            "name": "farmer",
-            "type": "address"
-            },
-            {
-            "indexed": false,
-            "internalType": "string",
-            "name": "produceName",
-            "type": "string"
-            }
-        ],
-        "name": "BatchCreated",
-        "type": "event"
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "batchId",
+          "type": "uint256"
         },
         {
-        "anonymous": false,
-        "inputs": [
-            {
-            "indexed": true,
-            "internalType": "uint256",
-            "name": "batchId",
-            "type": "uint256"
-            },
-            {
-            "indexed": true,
-            "internalType": "address",
-            "name": "from",
-            "type": "address"
-            },
-            {
-            "indexed": true,
-            "internalType": "address",
-            "name": "to",
-            "type": "address"
-            }
-        ],
-        "name": "OwnershipTransferred",
-        "type": "event"
+          "indexed": true,
+          "internalType": "address",
+          "name": "farmer",
+          "type": "address"
         },
         {
-        "inputs": [
-            {
-            "internalType": "uint256",
-            "name": "",
-            "type": "uint256"
-            },
-            {
-            "internalType": "uint256",
-            "name": "",
-            "type": "uint256"
-            }
-        ],
-        "name": "batchHistory",
-        "outputs": [
-            {
-            "internalType": "address",
-            "name": "",
-            "type": "address"
-            }
-        ],
-        "stateMutability": "view",
-        "type": "function"
+          "indexed": false,
+          "internalType": "string",
+          "name": "produceName",
+          "type": "string"
         },
         {
-        "inputs": [
-            {
-            "internalType": "uint256",
-            "name": "",
-            "type": "uint256"
-            }
-        ],
-        "name": "batches",
-        "outputs": [
-            {
-            "internalType": "uint256",
-            "name": "batchId",
-            "type": "uint256"
-            },
-            {
-            "internalType": "string",
-            "name": "produceName",
-            "type": "string"
-            },
-            {
-            "internalType": "string",
-            "name": "origin",
-            "type": "string"
-            },
-            {
-            "internalType": "string",
-            "name": "qualityMetrics",
-            "type": "string"
-            },
-            {
-            "internalType": "address payable",
-            "name": "currentOwner",
-            "type": "address"
-            },
-            {
-            "internalType": "uint256",
-            "name": "timestamp",
-            "type": "uint256"
-            }
-        ],
-        "stateMutability": "view",
-        "type": "function"
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "quantity",
+          "type": "uint256"
         },
         {
-        "inputs": [
-            {
-            "internalType": "string",
-            "name": "_produceName",
-            "type": "string"
-            },
-            {
-            "internalType": "string",
-            "name": "_origin",
-            "type": "string"
-            },
-            {
-            "internalType": "string",
-            "name": "_qualityMetrics",
-            "type": "string"
-            }
-        ],
-        "name": "createBatch",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-        },
-        {
-        "inputs": [
-            {
-            "internalType": "uint256",
-            "name": "_batchId",
-            "type": "uint256"
-            }
-        ],
-        "name": "getBatchHistory",
-        "outputs": [
-            {
-            "internalType": "address[]",
-            "name": "",
-            "type": "address[]"
-            }
-        ],
-        "stateMutability": "view",
-        "type": "function"
-        },
-        {
-        "inputs": [
-            {
-            "internalType": "uint256",
-            "name": "_batchId",
-            "type": "uint256"
-            },
-            {
-            "internalType": "address payable",
-            "name": "_newOwner",
-            "type": "address"
-            }
-        ],
-        "name": "transferOwnership",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "pricePerUnit",
+          "type": "uint256"
         }
-    ],
-    "bytecode": "0x608060405234801561001057600080fd5b50611376806100206000396000f3fe608060405234801561001057600080fd5b50600436106100575760003560e01c806329507f731461005c5780639000cb9614610078578063a6cfb6c9146100a8578063b32c4d8d146100c4578063c7a8ccb1146100f9575b600080fd5b61007660048036038101906100719190610970565b610129565b005b610092600480360381019061008d91906109b0565b610409565b60405161009f9190610a11565b60405180910390f35b6100c260048036038101906100bd9190610b72565b610457565b005b6100de60048036038101906100d99190610c19565b610633565b6040516100f096959493929190610ce3565b60405180910390f35b610113600480360381019061010e9190610c19565b610827565b6040516101209190610e17565b60405180910390f35b600073ffffffffffffffffffffffffffffffffffffffff166001600084815260200190815260200160002060040160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16036101ce576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016101c590610e85565b60405180910390fd5b6001600083815260200190815260200160002060040160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614610272576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161026990610f17565b60405180910390fd5b600073ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff16036102e1576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016102d890610fa9565b60405180910390fd5b806001600084815260200190815260200160002060040160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555060026000838152602001908152602001600020819080600181540180825580915050600190039060005260206000200160009091909190916101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055508073ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16837f16b85f49bf01212961345d3016c9a531894accf62eb7680f2045d79185cc0ec060405160405180910390a45050565b6002602052816000526040600020818154811061042557600080fd5b906000526020600020016000915091509054906101000a900473ffffffffffffffffffffffffffffffffffffffff1681565b60008081548092919061046990610ff8565b91905055506000805490506040518060c001604052808281526020018581526020018481526020018381526020013373ffffffffffffffffffffffffffffffffffffffff16815260200142815250600160008381526020019081526020016000206000820151816000015560208201518160010190816104e9919061124c565b5060408201518160020190816104ff919061124c565b506060820151816003019081610515919061124c565b5060808201518160040160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555060a0820151816005015590505060026000828152602001908152602001600020339080600181540180825580915050600190039060005260206000200160009091909190916101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055503373ffffffffffffffffffffffffffffffffffffffff16817f455fe5771863ad206137a00ecd2103bf528ba811090f3610fb2045972787ea4486604051610625919061131e565b60405180910390a350505050565b600160205280600052604060002060009150905080600001549080600101805461065c9061106f565b80601f01602080910402602001604051908101604052809291908181526020018280546106889061106f565b80156106d55780601f106106aa576101008083540402835291602001916106d5565b820191906000526020600020905b8154815290600101906020018083116106b857829003601f168201915b5050505050908060020180546106ea9061106f565b80601f01602080910402602001604051908101604052809291908181526020018280546107169061106f565b80156107635780601f1061073857610100808354040283529160200191610763565b820191906000526020600020905b81548152906001019060200180831161074657829003601f168201915b5050505050908060030180546107789061106f565b80601f01602080910402602001604051908101604052809291908181526020018280546107a49061106f565b80156107f15780601f106107c6576101008083540402835291602001916107f1565b820191906000526020600020905b8154815290600101906020018083116107d457829003601f168201915b5050505050908060040160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff16908060050154905086565b6060600260008381526020019081526020016000208054806020026020016040519081016040528092919081815260200182805480156108bc57602002820191906000526020600020905b8160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019060010190808311610872575b50505050509050919050565b6000604051905090565b600080fd5b600080fd5b6000819050919050565b6108ef816108dc565b81146108fa57600080fd5b50565b60008135905061090c816108e6565b92915050565b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b600061093d82610912565b9050919050565b61094d81610932565b811461095857600080fd5b50565b60008135905061096a81610944565b92915050565b60008060408385031215610987576109866108d2565b5b6000610995858286016108fd565b92505060206109a68582860161095b565b9150509250929050565b600080604083850312156109c7576109c66108d2565b5b60006109d5858286016108fd565b92505060206109e6858286016108fd565b9150509250929050565b60006109fb82610912565b9050919050565b610a0b816109f0565b82525050565b6000602082019050610a266000830184610a02565b92915050565b600080fd5b600080fd5b6000601f19601f8301169050919050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b610a7f82610a36565b810181811067ffffffffffffffff82111715610a9e57610a9d610a47565b5b80604052505050565b6000610ab16108c8565b9050610abd8282610a76565b919050565b600067ffffffffffffffff821115610add57610adc610a47565b5b610ae682610a36565b9050602081019050919050565b82818337600083830152505050565b6000610b15610b1084610ac2565b610aa7565b905082815260208101848484011115610b3157610b30610a31565b5b610b3c848285610af3565b509392505050565b600082601f830112610b5957610b58610a2c565b5b8135610b69848260208601610b02565b91505092915050565b600080600060608486031215610b8b57610b8a6108d2565b5b600084013567ffffffffffffffff811115610ba957610ba86108d7565b5b610bb586828701610b44565b935050602084013567ffffffffffffffff811115610bd657610bd56108d7565b5b610be286828701610b44565b925050604084013567ffffffffffffffff811115610c0357610c026108d7565b5b610c0f86828701610b44565b9150509250925092565b600060208284031215610c2f57610c2e6108d2565b5b6000610c3d848285016108fd565b91505092915050565b610c4f816108dc565b82525050565b600081519050919050565b600082825260208201905092915050565b60005b83811015610c8f578082015181840152602081019050610c74565b60008484015250505050565b6000610ca682610c55565b610cb08185610c60565b9350610cc0818560208601610c71565b610cc981610a36565b840191505092915050565b610cdd81610932565b82525050565b600060c082019050610cf86000830189610c46565b8181036020830152610d0a8188610c9b565b90508181036040830152610d1e8187610c9b565b90508181036060830152610d328186610c9b565b9050610d416080830185610cd4565b610d4e60a0830184610c46565b979650505050505050565b600081519050919050565b600082825260208201905092915050565b6000819050602082019050919050565b610d8e816109f0565b82525050565b6000610da08383610d85565b60208301905092915050565b6000602082019050919050565b6000610dc482610d59565b610dce8185610d64565b9350610dd983610d75565b8060005b83811015610e0a578151610df18882610d94565b9750610dfc83610dac565b925050600181019050610ddd565b5085935050505092915050565b60006020820190508181036000830152610e318184610db9565b905092915050565b7f426174636820646f6573206e6f742065786973742e0000000000000000000000600082015250565b6000610e6f601583610c60565b9150610e7a82610e39565b602082019050919050565b60006020820190508181036000830152610e9e81610e62565b9050919050565b7f4f6e6c79207468652063757272656e74206f776e65722063616e207472616e7360008201527f6665722e00000000000000000000000000000000000000000000000000000000602082015250565b6000610f01602483610c60565b9150610f0c82610ea5565b604082019050919050565b60006020820190508181036000830152610f3081610ef4565b9050919050565b7f43616e6e6f74207472616e7366657220746f20746865207a65726f206164647260008201527f6573732e00000000000000000000000000000000000000000000000000000000602082015250565b6000610f93602483610c60565b9150610f9e82610f37565b604082019050919050565b60006020820190508181036000830152610fc281610f86565b9050919050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b6000611003826108dc565b91507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff820361103557611034610fc9565b5b600182019050919050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052602260045260246000fd5b6000600282049050600182168061108757607f821691505b60208210810361109a57611099611040565b5b50919050565b60008190508160005260206000209050919050565b60006020601f8301049050919050565b600082821b905092915050565b6000600883026111027fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff826110c5565b61110c86836110c5565b95508019841693508086168417925050509392505050565b6000819050919050565b600061114961114461113f846108dc565b611124565b6108dc565b9050919050565b6000819050919050565b6111638361112e565b61117761116f82611150565b8484546110d2565b825550505050565b600090565b61118c61117f565b61119781848461115a565b505050565b5b818110156111bb576111b0600082611184565b60018101905061119d565b5050565b601f821115611200576111d1816110a0565b6111da846110b5565b810160208510156111e9578190505b6111fd6111f5856110b5565b83018261119c565b50505b505050565b600082821c905092915050565b600061122360001984600802611205565b1980831691505092915050565b600061123c8383611212565b9150826002028217905092915050565b61125582610c55565b67ffffffffffffffff81111561126e5761126d610a47565b5b611278825461106f565b6112838282856111bf565b600060209050601f8311600181146112b657600084156112a4578287015190505b6112ae8582611230565b865550611316565b601f1984166112c4866110a0565b60005b828110156112ec578489015182556001820191506020850194506020810190506112c7565b868310156113095784890151611305601f891682611212565b8355505b6001600288020188555050505b505050505050565b600060208201905081810360008301526113388184610c9b565b90509291505056fea264697066735822122065bd5c73437460ff66a70e4fe712a94bd65282c425d1e3830293692c182b1cf464736f6c63430008140033",
-    "deployedBytecode": "0x608060405234801561001057600080fd5b50600436106100575760003560e01c806329507f731461005c5780639000cb9614610078578063a6cfb6c9146100a8578063b32c4d8d146100c4578063c7a8ccb1146100f9575b600080fd5b61007660048036038101906100719190610970565b610129565b005b610092600480360381019061008d91906109b0565b610409565b60405161009f9190610a11565b60405180910390f35b6100c260048036038101906100bd9190610b72565b610457565b005b6100de60048036038101906100d99190610c19565b610633565b6040516100f096959493929190610ce3565b60405180910390f35b610113600480360381019061010e9190610c19565b610827565b6040516101209190610e17565b60405180910390f35b600073ffffffffffffffffffffffffffffffffffffffff166001600084815260200190815260200160002060040160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16036101ce576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016101c590610e85565b60405180910390fd5b6001600083815260200190815260200160002060040160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff1614610272576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161026990610f17565b60405180910390fd5b600073ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff16036102e1576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016102d890610fa9565b60405180910390fd5b806001600084815260200190815260200160002060040160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555060026000838152602001908152602001600020819080600181540180825580915050600190039060005260206000200160009091909190916101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055508073ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16837f16b85f49bf01212961345d3016c9a531894accf62eb7680f2045d79185cc0ec060405160405180910390a45050565b6002602052816000526040600020818154811061042557600080fd5b906000526020600020016000915091509054906101000a900473ffffffffffffffffffffffffffffffffffffffff1681565b60008081548092919061046990610ff8565b91905055506000805490506040518060c001604052808281526020018581526020018481526020018381526020013373ffffffffffffffffffffffffffffffffffffffff16815260200142815250600160008381526020019081526020016000206000820151816000015560208201518160010190816104e9919061124c565b5060408201518160020190816104ff919061124c565b506060820151816003019081610515919061124c565b5060808201518160040160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555060a0820151816005015590505060026000828152602001908152602001600020339080600181540180825580915050600190039060005260206000200160009091909190916101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055503373ffffffffffffffffffffffffffffffffffffffff16817f455fe5771863ad206137a00ecd2103bf528ba811090f3610fb2045972787ea4486604051610625919061131e565b60405180910390a350505050565b600160205280600052604060002060009150905080600001549080600101805461065c9061106f565b80601f01602080910402602001604051908101604052809291908181526020018280546106889061106f565b80156106d55780601f106106aa576101008083540402835291602001916106d5565b820191906000526020600020905b8154815290600101906020018083116106b857829003601f168201915b5050505050908060020180546106ea9061106f565b80601f01602080910402602001604051908101604052809291908181526020018280546107169061106f565b80156107635780601f1061073857610100808354040283529160200191610763565b820191906000526020600020905b81548152906001019060200180831161074657829003601f168201915b5050505050908060030180546107789061106f565b80601f01602080910402602001604051908101604052809291908181526020018280546107a49061106f565b80156107f15780601f106107c6576101008083540402835291602001916107f1565b820191906000526020600020905b8154815290600101906020018083116107d457829003601f168201915b5050505050908060040160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff16908060050154905086565b6060600260008381526020019081526020016000208054806020026020016040519081016040528092919081815260200182805480156108bc57602002820191906000526020600020905b8160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019060010190808311610872575b50505050509050919050565b6000604051905090565b600080fd5b600080fd5b6000819050919050565b6108ef816108dc565b81146108fa57600080fd5b50565b60008135905061090c816108e6565b92915050565b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b600061093d82610912565b9050919050565b61094d81610932565b811461095857600080fd5b50565b60008135905061096a81610944565b92915050565b60008060408385031215610987576109866108d2565b5b6000610995858286016108fd565b92505060206109a68582860161095b565b9150509250929050565b600080604083850312156109c7576109c66108d2565b5b60006109d5858286016108fd565b92505060206109e6858286016108fd565b9150509250929050565b60006109fb82610912565b9050919050565b610a0b816109f0565b82525050565b6000602082019050610a266000830184610a02565b92915050565b600080fd5b600080fd5b6000601f19601f8301169050919050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b610a7f82610a36565b810181811067ffffffffffffffff82111715610a9e57610a9d610a47565b5b80604052505050565b6000610ab16108c8565b9050610abd8282610a76565b919050565b600067ffffffffffffffff821115610add57610adc610a47565b5b610ae682610a36565b9050602081019050919050565b82818337600083830152505050565b6000610b15610b1084610ac2565b610aa7565b905082815260208101848484011115610b3157610b30610a31565b5b610b3c848285610af3565b509392505050565b600082601f830112610b5957610b58610a2c565b5b8135610b69848260208601610b02565b91505092915050565b600080600060608486031215610b8b57610b8a6108d2565b5b600084013567ffffffffffffffff811115610ba957610ba86108d7565b5b610bb586828701610b44565b935050602084013567ffffffffffffffff811115610bd657610bd56108d7565b5b610be286828701610b44565b925050604084013567ffffffffffffffff811115610c0357610c026108d7565b5b610c0f86828701610b44565b9150509250925092565b600060208284031215610c2f57610c2e6108d2565b5b6000610c3d848285016108fd565b91505092915050565b610c4f816108dc565b82525050565b600081519050919050565b600082825260208201905092915050565b60005b83811015610c8f578082015181840152602081019050610c74565b60008484015250505050565b6000610ca682610c55565b610cb08185610c60565b9350610cc0818560208601610c71565b610cc981610a36565b840191505092915050565b610cdd81610932565b82525050565b600060c082019050610cf86000830189610c46565b8181036020830152610d0a8188610c9b565b90508181036040830152610d1e8187610c9b565b90508181036060830152610d328186610c9b565b9050610d416080830185610cd4565b610d4e60a0830184610c46565b979650505050505050565b600081519050919050565b600082825260208201905092915050565b6000819050602082019050919050565b610d8e816109f0565b82525050565b6000610da08383610d85565b60208301905092915050565b6000602082019050919050565b6000610dc482610d59565b610dce8185610d64565b9350610dd983610d75565b8060005b83811015610e0a578151610df18882610d94565b9750610dfc83610dac565b925050600181019050610ddd565b5085935050505092915050565b60006020820190508181036000830152610e318184610db9565b905092915050565b7f426174636820646f6573206e6f742065786973742e0000000000000000000000600082015250565b6000610e6f601583610c60565b9150610e7a82610e39565b602082019050919050565b60006020820190508181036000830152610e9e81610e62565b9050919050565b7f4f6e6c79207468652063757272656e74206f776e65722063616e207472616e7360008201527f6665722e00000000000000000000000000000000000000000000000000000000602082015250565b6000610f01602483610c60565b9150610f0c82610ea5565b604082019050919050565b60006020820190508181036000830152610f3081610ef4565b9050919050565b7f43616e6e6f74207472616e7366657220746f20746865207a65726f206164647260008201527f6573732e00000000000000000000000000000000000000000000000000000000602082015250565b6000610f93602483610c60565b9150610f9e82610f37565b604082019050919050565b60006020820190508181036000830152610fc281610f86565b9050919050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b6000611003826108dc565b91507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff820361103557611034610fc9565b5b600182019050919050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052602260045260246000fd5b6000600282049050600182168061108757607f821691505b60208210810361109a57611099611040565b5b50919050565b60008190508160005260206000209050919050565b60006020601f8301049050919050565b600082821b905092915050565b6000600883026111027fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff826110c5565b61110c86836110c5565b95508019841693508086168417925050509392505050565b6000819050919050565b600061114961114461113f846108dc565b611124565b6108dc565b9050919050565b6000819050919050565b6111638361112e565b61117761116f82611150565b8484546110d2565b825550505050565b600090565b61118c61117f565b61119781848461115a565b505050565b5b818110156111bb576111b0600082611184565b60018101905061119d565b5050565b601f821115611200576111d1816110a0565b6111da846110b5565b810160208510156111e9578190505b6111fd6111f5856110b5565b83018261119c565b50505b505050565b600082821c905092915050565b600061122360001984600802611205565b1980831691505092915050565b600061123c8383611212565b9150826002028217905092915050565b61125582610c55565b67ffffffffffffffff81111561126e5761126d610a47565b5b611278825461106f565b6112838282856111bf565b600060209050601f8311600181146112b657600084156112a4578287015190505b6112ae8582611230565b865550611316565b601f1984166112c4866110a0565b60005b828110156112ec578489015182556001820191506020850194506020810190506112c7565b868310156113095784890151611305601f891682611212565b8355505b6001600288020188555050505b505050505050565b600060208201905081810360008301526113388184610c9b565b90509291505056fea264697066735822122065bd5c73437460ff66a70e4fe712a94bd65282c425d1e3830293692c182b1cf464736f6c63430008140033",
-    "linkReferences": {},
-    "deployedLinkReferences": {}
+      ],
+      "name": "BatchCreated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "batchId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "from",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "pricePerUnit",
+          "type": "uint256"
+        }
+      ],
+      "name": "OwnershipTransferred",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "batchHistory",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "batches",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "batchId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "produceName",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "origin",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "qualityMetrics",
+          "type": "string"
+        },
+        {
+          "internalType": "address payable",
+          "name": "currentOwner",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "quantity",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "_produceName",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_origin",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_qualityMetrics",
+          "type": "string"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_quantity",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_pricePerUnit",
+          "type": "uint256"
+        }
+      ],
+      "name": "createBatch",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_batchId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getBatchHistory",
+      "outputs": [
+        {
+          "internalType": "address[]",
+          "name": "",
+          "type": "address[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_batchId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getPriceHistory",
+      "outputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "priceHistory",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_batchId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address payable",
+          "name": "_newOwner",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_pricePerUnit",
+          "type": "uint256"
+        }
+      ],
+      "name": "transferOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
     }
+  ];
 
-
-        /* const contractABI = [
-            {
-                "anonymous": false,
-                "inputs": [
-                    {
-                        "indexed": true,
-                        "internalType": "uint256",
-                        "name": "batchId",
-                        "type": "uint256"
-                    },
-                    {
-                        "indexed": true,
-                        "internalType": "address",
-                        "name": "farmer",
-                        "type": "address"
-                    },
-                    {
-                        "indexed": false,
-                        "internalType": "string",
-                        "name": "produceName",
-                        "type": "string"
-                    }
-                ],
-                "name": "BatchCreated",
-                "type": "event"
-            },
-            {
-                "anonymous": false,
-                "inputs": [
-                    {
-                        "indexed": true,
-                        "internalType": "uint256",
-                        "name": "batchId",
-                        "type": "uint256"
-                    },
-                    {
-                        "indexed": true,
-                        "internalType": "address",
-                        "name": "from",
-                        "type": "address"
-                    },
-                    {
-                        "indexed": true,
-                        "internalType": "address",
-                        "name": "to",
-                        "type": "address"
-                    }
-                ],
-                "name": "OwnershipTransferred",
-                "type": "event"
-            },
-            {
-                "inputs": [
-                    {
-                        "internalType": "uint256",
-                        "name": "",
-                        "type": "uint256"
-                    },
-                    {
-                        "internalType": "uint256",
-                        "name": "",
-                        "type": "uint256"
-                    }
-                ],
-                "name": "batchHistory",
-                "outputs": [
-                    {
-                        "internalType": "address",
-                        "name": "",
-                        "type": "address"
-                    }
-                ],
-                "stateMutability": "view",
-                "type": "function"
-            },
-            {
-                "inputs": [
-                    {
-                        "internalType": "uint256",
-                        "name": "",
-                        "type": "uint256"
-                    }
-                ],
-                "name": "batches",
-                "outputs": [
-                    {
-                        "internalType": "uint256",
-                        "name": "batchId",
-                        "type": "uint256"
-                    },
-                    {
-                        "internalType": "string",
-                        "name": "produceName",
-                        "type": "string"
-                    },
-                    {
-                        "internalType": "string",
-                        "name": "origin",
-                        "type": "string"
-                    },
-                    {
-                        "internalType": "string",
-                        "name": "qualityMetrics",
-                        "type": "string"
-                    },
-                    {
-                        "internalType": "address payable",
-                        "name": "currentOwner",
-                        "type": "address"
-                    },
-                    {
-                        "internalType": "uint256",
-                        "name": "timestamp",
-                        "type": "uint256"
-                    }
-                ],
-                "stateMutability": "view",
-                "type": "function"
-            },
-            {
-                "inputs": [
-                    {
-                        "internalType": "string",
-                        "name": "_produceName",
-                        "type": "string"
-                    },
-                    {
-                        "internalType": "string",
-                        "name": "_origin",
-                        "type": "string"
-                    },
-                    {
-                        "internalType": "string",
-                        "name": "_qualityMetrics",
-                        "type": "string"
-                    }
-                ],
-                "name": "createBatch",
-                "outputs": [],
-                "stateMutability": "nonpayable",
-                "type": "function"
-            },
-            {
-                "inputs": [
-                    {
-                        "internalType": "uint256",
-                        "name": "_batchId",
-                        "type": "uint256"
-                    }
-                ],
-                "name": "getBatchHistory",
-                "outputs": [
-                    {
-                        "internalType": "address[]",
-                        "name": "",
-                        "type": "address[]"
-                    }
-                ],
-                "stateMutability": "view",
-                "type": "function"
-            },
-            {
-                "inputs": [
-                    {
-                        "internalType": "uint256",
-                        "name": "_batchId",
-                        "type": "uint256"
-                    },
-                    {
-                        "internalType": "address payable",
-                        "name": "_newOwner",
-                        "type": "address"
-                    }
-                ],
-                "name": "transferOwnership",
-                "outputs": [],
-                "stateMutability": "nonpayable",
-                "type": "function"
-            }
-        ]; */
-
-
-
-        
         // --- APPLICATION LOGIC --- //
         let provider;
         let signer;
         let contract;
 
-        // Hardcoded roles for the first 3 accounts from the Hardhat node
+        // Hardcoded roles for the first 4 accounts from the Hardhat node
         const hardhatAccounts = [
-            "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-            "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-            "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"
+            "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266", // Farmer (Account #0)
+            "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", // Distributor (Account #1)
+            "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC", // Retailer (Account #2)
+            "0x90F79bf6EB2c4f870365E785982E1f101E93b906", // Consumer (Account #3)
+            "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65"  // Admin (Account #4)
         ];
         const ROLES = {
-            [hardhatAccounts[0].toLowerCase()]: 'Deployer/Admin',
-            [hardhatAccounts[1].toLowerCase()]: 'Farmer',
-            [hardhatAccounts[2].toLowerCase()]: 'Distributor'
+            [hardhatAccounts[0].toLowerCase()]: 'Farmer (Ravi)',
+            [hardhatAccounts[1].toLowerCase()]: 'Distributor (FreshSupply)',
+            [hardhatAccounts[2].toLowerCase()]: 'Retailer (GreenMart)',
+            [hardhatAccounts[3].toLowerCase()]: 'Consumer (Anita)',
+            [hardhatAccounts[4].toLowerCase()]: 'Admin'
         };
 
         const connectButton = document.getElementById('connect-button');
@@ -612,6 +515,12 @@
                 signer = provider.getSigner();
                 const address = await signer.getAddress();
                 
+                if (!contractAddress.startsWith('0x') || (contractABI && contractABI.length === 0)) {
+                    log('Configuration Error: Please paste the new contract address and ABI.', 'error');
+                    alert('Configuration Error: Please paste the new contract address and ABI into index.html.');
+                    return;
+                }
+                
                 contract = new ethers.Contract(contractAddress, contractABI, signer);
 
                 statusText.textContent = 'Connected';
@@ -631,40 +540,39 @@
         }
 
         function updateRoleAndUI(address) {
-            const role = ROLES[address.toLowerCase()] || 'Consumer/Retailer';
+            const role = ROLES[address.toLowerCase()] || 'Consumer (Anita)';
             accountRole.textContent = role;
             
-            // Show UI elements based on role
             farmerActions.classList.add('hidden');
             stakeholderActions.classList.add('hidden');
 
-            if (role === 'Farmer') {
+            if (role.includes('Farmer')) {
                 farmerActions.classList.remove('hidden');
-                stakeholderActions.classList.remove('hidden');
-            } else if (role === 'Distributor' || role === 'Deployer/Admin') {
-                stakeholderActions.classList.remove('hidden');
+            } 
+            if (role.includes('Farmer') || role.includes('Distributor') || role.includes('Retailer') || role.includes('Admin')) {
+                 stakeholderActions.classList.remove('hidden');
             }
         }
         
-        // --- Form Event Listeners ---
         createBatchForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const produceName = document.getElementById('produceName').value;
             const origin = document.getElementById('origin').value;
             const qualityMetrics = document.getElementById('qualityMetrics').value;
+            const quantity = document.getElementById('quantity').value;
+            const pricePerUnit = document.getElementById('pricePerUnit').value;
 
             if (!contract) return log('Please connect your wallet first.', 'error');
             
             log('Sending transaction to create new batch...');
             showLoading('Creating new batch...');
             try {
-                const tx = await contract.createBatch(produceName, origin, qualityMetrics);
-                await tx.wait(); // Wait for the transaction to be mined
+                const tx = await contract.createBatch(produceName, origin, qualityMetrics, quantity, pricePerUnit);
+                await tx.wait();
                 log('Transaction successful! Batch created.', 'success');
                 createBatchForm.reset();
             } catch (error) {
                 log(`Error creating batch: ${error.message}`, 'error');
-                console.error(error);
             } finally {
                 hideLoading();
             }
@@ -674,19 +582,19 @@
             e.preventDefault();
             const batchId = document.getElementById('transferBatchId').value;
             const newOwner = document.getElementById('newOwner').value;
+            const transferPrice = document.getElementById('transferPrice').value;
 
             if (!contract) return log('Please connect your wallet first.', 'error');
 
             log(`Sending transaction to transfer Batch #${batchId}...`);
             showLoading('Transferring ownership...');
             try {
-                const tx = await contract.transferOwnership(batchId, newOwner);
+                const tx = await contract.transferOwnership(batchId, newOwner, transferPrice);
                 await tx.wait();
                 log(`Batch #${batchId} transferred successfully to ${newOwner}.`, 'success');
                 transferForm.reset();
             } catch (error) {
                 log(`Error transferring ownership: ${error.message}`, 'error');
-                console.error(error);
             } finally {
                 hideLoading();
             }
@@ -701,26 +609,28 @@
             log(`Tracing Batch #${batchId}...`);
             showLoading('Fetching batch history...');
             try {
-                const batchDetails = await contract.batches(batchId);
-                const history = await contract.getBatchHistory(batchId);
+                const [batchDetails, ownerHistory, priceHistory] = await Promise.all([
+                    contract.batches(batchId),
+                    contract.getBatchHistory(batchId),
+                    contract.getPriceHistory(batchId)
+                ]);
                 
                 if(batchDetails.currentOwner === "0x0000000000000000000000000000000000000000") {
                     throw new Error("Batch does not exist.");
                 }
 
-                displayTraceResults(batchDetails, history);
+                displayTraceResults(batchDetails, ownerHistory, priceHistory);
                 log(`Trace for Batch #${batchId} successful.`, 'success');
 
             } catch (error) {
                 log(`Error tracing batch: ${error.message}`, 'error');
-                console.error(error);
                 traceResults.classList.add('hidden');
             } finally {
                 hideLoading();
             }
         });
 
-        function displayTraceResults(details, history) {
+        function displayTraceResults(details, ownerHistory, priceHistory) {
             const batchDetailsDiv = document.getElementById('batch-details');
             const batchHistoryDiv = document.getElementById('batch-history');
 
@@ -728,38 +638,40 @@
                 <strong>Produce:</strong> ${details.produceName}<br>
                 <strong>Origin:</strong> ${details.origin}<br>
                 <strong>Quality:</strong> ${details.qualityMetrics}<br>
+                <strong>Initial Quantity:</strong> ${details.quantity.toString()} kg<br>
                 <strong>Current Owner:</strong> <span class="font-mono text-xs">${details.currentOwner}</span><br>
                 <strong>Created:</strong> ${new Date(details.timestamp * 1000).toLocaleString()}
             `;
 
-            batchHistoryDiv.innerHTML = history.map((owner, index) => {
+            batchHistoryDiv.innerHTML = ownerHistory.map((owner, index) => {
                 const role = ROLES[owner.toLowerCase()] || 'Stakeholder';
+                const price = priceHistory[index] ? `sold at ₹${priceHistory[index].toString()}/kg` : 'created the batch';
+                const nextRole = ROLES[ownerHistory[index+1]?.toLowerCase()] || 'Consumer';
+
                 return `
                     <div class="flex items-center gap-4">
                         <div class="flex-shrink-0 bg-purple-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold">${index + 1}</div>
                         <div>
-                            <p class="font-semibold">${role}</p>
+                            <p class="font-semibold">${role} ${index < ownerHistory.length -1 ? `${price} to ${nextRole}`: `is the current owner.`}</p>
                             <p class="font-mono text-xs text-gray-500 dark:text-gray-400">${owner}</p>
                         </div>
                     </div>
                 `;
-            }).join('<div class="h-4 w-px bg-purple-300 dark:bg-purple-700 ml-4"></div>'); // Connector line
+            }).join('<div class="h-4 w-px bg-purple-300 dark:bg-purple-700 ml-4"></div>');
 
             traceResults.classList.remove('hidden');
         }
 
-        // Listen for smart contract events
         function listenForEvents() {
             if (!contract) return;
-
-            contract.on("BatchCreated", (batchId, farmer, produceName) => {
-                log(`EVENT: New batch #${batchId} (${produceName}) created by farmer ${farmer.substring(0, 8)}...`, 'success');
+            contract.on("BatchCreated", (batchId, farmer, produceName, quantity, price) => {
+                log(`EVENT: New batch #${batchId} (${produceName}, ${quantity.toString()}kg at ₹${price.toString()}/kg) created.`, 'success');
             });
-
-            contract.on("OwnershipTransferred", (batchId, from, to) => {
-                log(`EVENT: Ownership of batch #${batchId} transferred from ${from.substring(0, 8)}... to ${to.substring(0, 8)}...`, 'info');
+            contract.on("OwnershipTransferred", (batchId, from, to, price) => {
+                log(`EVENT: Batch #${batchId} sold to new owner for ₹${price.toString()}/kg.`, 'info');
             });
         }
     </script>
 </body>
 </html>
+
