@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KisaanVishwas - Supply Chain Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Ethers.js library for blockchain interaction -->
+    <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js" type="application/javascript"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        .log-entry {
+            border-left: 3px solid;
+            transition: all 0.3s ease-in-out;
+        }
+        .log-success { border-color: #22c55e; }
+        .log-error { border-color: #ef4444; }
+        .log-info { border-color: #3b82f6; }
+        .lds-ellipsis {
+            display: inline-block;
+            position: relative;
+            width: 40px;
+            height: 40px;
+        }
+        .lds-ellipsis div {
+            position: absolute;
+            top: 16px;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #fff;
+            animation-timing-function: cubic-bezier(0, 1, 1, 0);
+        }
+        .lds-ellipsis div:nth-child(1) { left: 4px; animation: lds-ellipsis1 0.6s infinite; }
+        .lds-ellipsis div:nth-child(2) { left: 4px; animation: lds-ellipsis2 0.6s infinite; }
+        .lds-ellipsis div:nth-child(3) { left: 16px; animation: lds-ellipsis2 0.6s infinite; }
+        .lds-ellipsis div:nth-child(4) { left: 28px; animation: lds-ellipsis3 0.6s infinite; }
+        @keyframes lds-ellipsis1 {
+            0% { transform: scale(0); }
+            100% { transform: scale(1); }
+        }
+        @keyframes lds-ellipsis3 {
+            0% { transform: scale(1); }
+            100% { transform: scale(0); }
+        }
+        @keyframes lds-ellipsis2 {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(12px, 0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen transition-colors duration-300">
+
+    <!-- Loading Modal -->
+    <div id="loadingModal" class="fixed inset-0 bg-black bg-opacity-60 flex-col items-center justify-center z-50 hidden">
+        <div class="lds-ellipsis"><div></div><div></div><div></div><div></div></div>
+        <p id="loadingText" class="text-white text-lg mt-2 font-medium">Processing Transaction...</p>
+    </div>
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold text-gray-800 dark:text-white">Kisaan<span class="text-green-500">Vishwas</span></h1>
+            <p class="text-gray-600 dark:text-gray-400 mt-2">A Transparent Agricultural Supply Chain on the Blockchain</p>
+        </header>
+
+        <!-- Connection Status -->
+        <div id="connection-status" class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md mb-8 flex flex-col md:flex-row items-center justify-between">
+            <div class="mb-4 md:mb-0">
+                <p class="text-sm text-gray-500 dark:text-gray-400">Status</p>
+                <p id="status-text" class="font-semibold text-red-500">Not Connected</p>
+            </div>
+            <div class="text-center md:text-left mb-4 md:mb-0">
+                <p class="text-sm text-gray-500 dark:text-gray-400">Account</p>
+                <p id="account-address" class="font-mono text-xs md:text-sm break-all">No Account Detected</p>
+            </div>
+             <div class="text-center md:text-left mb-4 md:mb-0">
+                <p class="text-sm text-gray-500 dark:text-gray-400">Your Role</p>
+                <p id="account-role" class="font-semibold text-gray-500">Unknown</p>
+            </div>
+            <button id="connect-button" class="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition duration-300 w-full md:w-auto">
+                Connect Wallet
+            </button>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Left Column: Actions -->
+            <div class="lg:col-span-1 space-y-8">
+                <!-- Farmer Actions -->
+                <div id="farmer-actions" class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md hidden">
+                    <h2 class="text-2xl font-bold mb-4 border-b-2 border-green-500 pb-2">Farmer Dashboard</h2>
+                    <form id="create-batch-form" class="space-y-4">
+                        <div>
+                            <label for="produceName" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Produce Name</label>
+                            <input type="text" id="produceName" required class="mt-1 block w-full bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500">
+                        </div>
+                        <div>
+                            <label for="origin" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Origin Farm</label>
+                            <input type="text" id="origin" required class="mt-1 block w-full bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500">
+                        </div>
+                        <div>
+                            <label for="qualityMetrics" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Quality Metrics</label>
+                            <input type="text" id="qualityMetrics" required placeholder="e.g., Grade A, Organic" class="mt-1 block w-full bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500">
+                        </div>
+                        <button type="submit" class="w-full bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition duration-300">Create New Batch</button>
+                    </form>
+                </div>
+
+                <!-- Stakeholder Actions -->
+                <div id="stakeholder-actions" class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md hidden">
+                    <h2 class="text-2xl font-bold mb-4 border-b-2 border-blue-500 pb-2">Stakeholder Dashboard</h2>
+                    <form id="transfer-form" class="space-y-4">
+                         <div>
+                            <label for="transferBatchId" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Batch ID</label>
+                            <input type="number" id="transferBatchId" required class="mt-1 block w-full bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label for="newOwner" class="block text-sm font-medium text-gray-700 dark:text-gray-300">New Owner Address</label>
+                            <input type="text" id="newOwner" required class="mt-1 block w-full bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-300">Transfer Ownership</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Right Column: Trace & Logs -->
+            <div class="lg:col-span-2 space-y-8">
+                <!-- Traceability Section -->
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+                    <h2 class="text-2xl font-bold mb-4 border-b-2 border-purple-500 pb-2">Trace Your Produce</h2>
+                    <form id="trace-form" class="flex flex-col sm:flex-row gap-4">
+                        <input type="number" id="traceBatchId" placeholder="Enter Batch ID" required class="flex-grow bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                        <button type="submit" class="bg-purple-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-purple-700 transition duration-300">Trace</button>
+                    </form>
+                    <div id="trace-results" class="mt-6 hidden">
+                        <h3 class="text-xl font-semibold mb-2">Batch Details</h3>
+                        <div id="batch-details" class="bg-gray-50 dark:bg-gray-700 p-4 rounded-md text-sm mb-4"></div>
+                        <h3 class="text-xl font-semibold mb-2">Chain of Custody</h3>
+                        <div id="batch-history" class="space-y-2"></div>
+                    </div>
+                </div>
+
+                <!-- Immutability Explanation -->
+                <div class="bg-yellow-100 dark:bg-yellow-900 border-l-4 border-yellow-500 text-yellow-800 dark:text-yellow-200 p-4 rounded-r-lg shadow-md">
+                    <h3 class="font-bold text-lg mb-2">Can Records Be Manipulated?</h3>
+                    <p class="text-sm">No. Every transaction (like creating or transferring a batch) is cryptographically signed and linked to the previous one, forming a chain. Any attempt to alter past data would break this chain, and the change would be instantly rejected by the entire network. The history you see is permanent and verifiable by anyone, ensuring complete integrity.</p>
+                </div>
+
+                <!-- Transaction Log -->
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+                     <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-2xl font-bold">Transaction Log</h2>
+                        <button id="clear-log-button" class="text-sm text-gray-500 hover:text-red-500 transition-colors">Clear Log</button>
+                    </div>
+                    <div id="log-output" class="h-64 overflow-y-auto bg-gray-50 dark:bg-gray-900 rounded-md p-4 space-y-3 text-sm font-mono">
+                        <p class="log-entry log-info p-2 rounded-md">Welcome! Connect your wallet to begin.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION --- //
+        // 1. PASTE YOUR DEPLOYED CONTRACT ADDRESS HERE
+        const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3"; 
+
+        // 2. PASTE YOUR CONTRACT'S ABI (from artifacts/contracts/SupplyChain.sol/SupplyChain.json) HERE
+        const contractABI = [
+            {
+                "anonymous": false,
+                "inputs": [
+                    {
+                        "indexed": true,
+                        "internalType": "uint256",
+                        "name": "batchId",
+                        "type": "uint256"
+                    },
+                    {
+                        "indexed": true,
+                        "internalType": "address",
+                        "name": "farmer",
+                        "type": "address"
+                    },
+                    {
+                        "indexed": false,
+                        "internalType": "string",
+                        "name": "produceName",
+                        "type": "string"
+                    }
+                ],
+                "name": "BatchCreated",
+                "type": "event"
+            },
+            {
+                "anonymous": false,
+                "inputs": [
+                    {
+                        "indexed": true,
+                        "internalType": "uint256",
+                        "name": "batchId",
+                        "type": "uint256"
+                    },
+                    {
+                        "indexed": true,
+                        "internalType": "address",
+                        "name": "from",
+                        "type": "address"
+                    },
+                    {
+                        "indexed": true,
+                        "internalType": "address",
+                        "name": "to",
+                        "type": "address"
+                    }
+                ],
+                "name": "OwnershipTransferred",
+                "type": "event"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "batchHistory",
+                "outputs": [
+                    {
+                        "internalType": "address",
+                        "name": "",
+                        "type": "address"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "batches",
+                "outputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "batchId",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "produceName",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "origin",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "qualityMetrics",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "address payable",
+                        "name": "currentOwner",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "timestamp",
+                        "type": "uint256"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "string",
+                        "name": "_produceName",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "_origin",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "_qualityMetrics",
+                        "type": "string"
+                    }
+                ],
+                "name": "createBatch",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "_batchId",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "getBatchHistory",
+                "outputs": [
+                    {
+                        "internalType": "address[]",
+                        "name": "",
+                        "type": "address[]"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "_batchId",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "address payable",
+                        "name": "_newOwner",
+                        "type": "address"
+                    }
+                ],
+                "name": "transferOwnership",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            }
+        ];
+
+        // --- APPLICATION LOGIC --- //
+        let provider;
+        let signer;
+        let contract;
+
+        // Hardcoded roles for the first 3 accounts from the Hardhat node
+        const hardhatAccounts = [
+            "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+            "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"
+        ];
+        const ROLES = {
+            [hardhatAccounts[0].toLowerCase()]: 'Deployer/Admin',
+            [hardhatAccounts[1].toLowerCase()]: 'Farmer',
+            [hardhatAccounts[2].toLowerCase()]: 'Distributor'
+        };
+
+        const connectButton = document.getElementById('connect-button');
+        const statusText = document.getElementById('status-text');
+        const accountAddress = document.getElementById('account-address');
+        const accountRole = document.getElementById('account-role');
+        const logOutput = document.getElementById('log-output');
+        const loadingModal = document.getElementById('loadingModal');
+        const loadingText = document.getElementById('loadingText');
+
+        // Form elements
+        const createBatchForm = document.getElementById('create-batch-form');
+        const transferForm = document.getElementById('transfer-form');
+        const traceForm = document.getElementById('trace-form');
+        const clearLogButton = document.getElementById('clear-log-button');
+
+        // Dashboard sections
+        const farmerActions = document.getElementById('farmer-actions');
+        const stakeholderActions = document.getElementById('stakeholder-actions');
+        const traceResults = document.getElementById('trace-results');
+        
+        connectButton.addEventListener('click', connectWallet);
+        clearLogButton.addEventListener('click', () => { logOutput.innerHTML = ''; });
+
+        function log(message, type = 'info') {
+            const entry = document.createElement('p');
+            entry.textContent = `> ${message}`;
+            entry.className = `log-entry log-${type} p-2 rounded-md animate-fade-in`;
+            logOutput.appendChild(entry);
+            logOutput.scrollTop = logOutput.scrollHeight;
+        }
+
+        function showLoading(text) {
+            loadingText.textContent = text;
+            loadingModal.style.display = 'flex';
+        }
+
+        function hideLoading() {
+            loadingModal.style.display = 'none';
+        }
+        
+        async function connectWallet() {
+            if (typeof window.ethereum === 'undefined') {
+                log('MetaMask is not installed!', 'error');
+                return alert('Please install MetaMask to use this application.');
+            }
+
+            try {
+                provider = new ethers.providers.Web3Provider(window.ethereum);
+                await provider.send("eth_requestAccounts", []);
+                signer = provider.getSigner();
+                const address = await signer.getAddress();
+                
+                contract = new ethers.Contract(contractAddress, contractABI, signer);
+
+                statusText.textContent = 'Connected';
+                statusText.className = 'font-semibold text-green-500';
+                accountAddress.textContent = address;
+                connectButton.textContent = 'Wallet Connected';
+                connectButton.disabled = true;
+
+                updateRoleAndUI(address);
+                log(`Wallet connected successfully: ${address}`, 'success');
+                listenForEvents();
+
+            } catch (error) {
+                log(`Connection failed: ${error.message}`, 'error');
+                console.error(error);
+            }
+        }
+
+        function updateRoleAndUI(address) {
+            const role = ROLES[address.toLowerCase()] || 'Consumer/Retailer';
+            accountRole.textContent = role;
+            
+            // Show UI elements based on role
+            farmerActions.classList.add('hidden');
+            stakeholderActions.classList.add('hidden');
+
+            if (role === 'Farmer') {
+                farmerActions.classList.remove('hidden');
+                stakeholderActions.classList.remove('hidden');
+            } else if (role === 'Distributor' || role === 'Deployer/Admin') {
+                stakeholderActions.classList.remove('hidden');
+            }
+        }
+        
+        // --- Form Event Listeners ---
+        createBatchForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const produceName = document.getElementById('produceName').value;
+            const origin = document.getElementById('origin').value;
+            const qualityMetrics = document.getElementById('qualityMetrics').value;
+
+            if (!contract) return log('Please connect your wallet first.', 'error');
+            
+            log('Sending transaction to create new batch...');
+            showLoading('Creating new batch...');
+            try {
+                const tx = await contract.createBatch(produceName, origin, qualityMetrics);
+                await tx.wait(); // Wait for the transaction to be mined
+                log('Transaction successful! Batch created.', 'success');
+                createBatchForm.reset();
+            } catch (error) {
+                log(`Error creating batch: ${error.message}`, 'error');
+                console.error(error);
+            } finally {
+                hideLoading();
+            }
+        });
+
+        transferForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const batchId = document.getElementById('transferBatchId').value;
+            const newOwner = document.getElementById('newOwner').value;
+
+            if (!contract) return log('Please connect your wallet first.', 'error');
+
+            log(`Sending transaction to transfer Batch #${batchId}...`);
+            showLoading('Transferring ownership...');
+            try {
+                const tx = await contract.transferOwnership(batchId, newOwner);
+                await tx.wait();
+                log(`Batch #${batchId} transferred successfully to ${newOwner}.`, 'success');
+                transferForm.reset();
+            } catch (error) {
+                log(`Error transferring ownership: ${error.message}`, 'error');
+                console.error(error);
+            } finally {
+                hideLoading();
+            }
+        });
+
+        traceForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const batchId = document.getElementById('traceBatchId').value;
+
+            if (!contract) return log('Please connect your wallet first.', 'error');
+
+            log(`Tracing Batch #${batchId}...`);
+            showLoading('Fetching batch history...');
+            try {
+                const batchDetails = await contract.batches(batchId);
+                const history = await contract.getBatchHistory(batchId);
+                
+                if(batchDetails.currentOwner === "0x0000000000000000000000000000000000000000") {
+                    throw new Error("Batch does not exist.");
+                }
+
+                displayTraceResults(batchDetails, history);
+                log(`Trace for Batch #${batchId} successful.`, 'success');
+
+            } catch (error) {
+                log(`Error tracing batch: ${error.message}`, 'error');
+                console.error(error);
+                traceResults.classList.add('hidden');
+            } finally {
+                hideLoading();
+            }
+        });
+
+        function displayTraceResults(details, history) {
+            const batchDetailsDiv = document.getElementById('batch-details');
+            const batchHistoryDiv = document.getElementById('batch-history');
+
+            batchDetailsDiv.innerHTML = `
+                <strong>Produce:</strong> ${details.produceName}<br>
+                <strong>Origin:</strong> ${details.origin}<br>
+                <strong>Quality:</strong> ${details.qualityMetrics}<br>
+                <strong>Current Owner:</strong> <span class="font-mono text-xs">${details.currentOwner}</span><br>
+                <strong>Created:</strong> ${new Date(details.timestamp * 1000).toLocaleString()}
+            `;
+
+            batchHistoryDiv.innerHTML = history.map((owner, index) => {
+                const role = ROLES[owner.toLowerCase()] || 'Stakeholder';
+                return `
+                    <div class="flex items-center gap-4">
+                        <div class="flex-shrink-0 bg-purple-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold">${index + 1}</div>
+                        <div>
+                            <p class="font-semibold">${role}</p>
+                            <p class="font-mono text-xs text-gray-500 dark:text-gray-400">${owner}</p>
+                        </div>
+                    </div>
+                `;
+            }).join('<div class="h-4 w-px bg-purple-300 dark:bg-purple-700 ml-4"></div>'); // Connector line
+
+            traceResults.classList.remove('hidden');
+        }
+
+        // Listen for smart contract events
+        function listenForEvents() {
+            if (!contract) return;
+
+            contract.on("BatchCreated", (batchId, farmer, produceName) => {
+                log(`EVENT: New batch #${batchId} (${produceName}) created by farmer ${farmer.substring(0, 8)}...`, 'success');
+            });
+
+            contract.on("OwnershipTransferred", (batchId, from, to) => {
+                log(`EVENT: Ownership of batch #${batchId} transferred from ${from.substring(0, 8)}... to ${to.substring(0, 8)}...`, 'info');
+            });
+        }
+    </script>
+</body>
+</html>
