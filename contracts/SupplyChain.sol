@@ -2,128 +2,120 @@
 pragma solidity ^0.8.20;
 
 /**
- * @title SupplyChain
- * @dev A smart contract to track agricultural produce from farm to consumer.
- * It allows for the creation of product batches, transfer of ownership,
- * and retrieval of the full history of a batch, ensuring transparency.
+ * @title SupplyChain (Upgraded)
+ * @dev A smart contract to track agricultural produce with price and quantity.
+ * It allows for the creation of batches and tracks the price at each transfer,
+ * creating a transparent price progression history for consumers.
  */
 contract SupplyChain {
-    /**
-     * @dev A counter to ensure each batch gets a unique ID.
-     * It's private to prevent external contracts from manipulating it.
-     */
     uint256 private batchCounter;
 
     /**
      * @dev Represents a single batch of produce in the supply chain.
-     * Each batch has a unique ID, descriptive details, a current owner,
-     * and a creation timestamp.
+     * Now includes initial quantity and the price it was created at.
      */
     struct Batch {
-        uint256 batchId;         // Unique identifier for the batch
-        string produceName;      // Name of the produce (e.g., "Organic Tomatoes")
-        string origin;           // The farm or location of origin
-        string qualityMetrics;   // Metrics like "Grade A", "Organic Certified"
-        address payable currentOwner; // The Ethereum address of the current stakeholder
-        uint256 timestamp;       // Timestamp of when the batch was created
+        uint256 batchId;
+        string produceName;
+        string origin;
+        string qualityMetrics;
+        address payable currentOwner;
+        uint256 timestamp;
+        uint256 quantity; // the initial quantity of the batch (e.g., in kg)
     }
 
-    /**
-     * @dev A mapping from a batch ID to its corresponding Batch struct.
-     * This allows for efficient retrieval of batch details.
-     */
     mapping(uint256 => Batch) public batches;
-
-    /**
-     * @dev A mapping to store the chain of custody for each batch.
-     * The key is the batch ID, and the value is an array of addresses
-     * representing the stakeholders who have owned the batch.
-     */
     mapping(uint256 => address[]) public batchHistory;
 
-    //- EVENTS -//
-
     /**
-     * @dev Emitted when a new batch of produce is created and added to the supply chain.
-     * @param batchId The unique ID of the newly created batch.
-     * @param farmer The address of the farmer who created the batch.
-     * @param produceName The name of the produce.
+     * @dev NEW: A mapping to store the price progression for each batch.
+     * The key is the batch ID, and the value is an array of prices (per unit)
+     * corresponding to each step in the ownership history.
      */
-    event BatchCreated(uint256 indexed batchId, address indexed farmer, string produceName);
+    mapping(uint256 => uint256[]) public priceHistory;
+
+    // --- EVENTS --- //
+
+    event BatchCreated(
+        uint256 indexed batchId,
+        address indexed farmer,
+        string produceName,
+        uint256 quantity,
+        uint256 pricePerUnit
+    );
+
+    event OwnershipTransferred(
+        uint256 indexed batchId,
+        address indexed from,
+        address indexed to,
+        uint256 pricePerUnit
+    );
+
+    // --- FUNCTIONS --- //
 
     /**
-     * @dev Emitted when the ownership of a batch is transferred to a new stakeholder.
-     * @param batchId The ID of the batch being transferred.
-     * @param from The address of the previous owner.
-     * @param to The address of the new owner.
-     */
-    event OwnershipTransferred(uint256 indexed batchId, address indexed from, address indexed to);
-
-    //- FUNCTIONS -//
-
-    /**
-     * @dev Creates a new batch of produce.
-     * Only callable by an external account (e.g., a farmer).
-     * The caller (msg.sender) becomes the initial owner.
+     * @dev Creates a new batch of produce with initial quantity and price.
      * @param _produceName The name of the produce.
      * @param _origin The origin farm/location.
      * @param _qualityMetrics A description of the produce quality.
+     * @param _quantity The initial quantity of the batch (e.g., 500 for 500kg).
+     * @param _pricePerUnit The initial sale price from the farmer (e.g., 20 for ₹20/kg).
      */
-    function createBatch(string memory _produceName, string memory _origin, string memory _qualityMetrics) public {
-        // Increment the counter to get a new unique ID
+    function createBatch(
+        string memory _produceName,
+        string memory _origin,
+        string memory _qualityMetrics,
+        uint256 _quantity,
+        uint256 _pricePerUnit
+    ) public {
         batchCounter++;
         uint256 newBatchId = batchCounter;
 
-        // Create the new Batch struct in storage
         batches[newBatchId] = Batch({
             batchId: newBatchId,
             produceName: _produceName,
             origin: _origin,
             qualityMetrics: _qualityMetrics,
-            currentOwner: payable(msg.sender), // The creator is the first owner
-            timestamp: block.timestamp
+            currentOwner: payable(msg.sender),
+            timestamp: block.timestamp,
+            quantity: _quantity // Set initial quantity
         });
 
-        // Start the history trail with the creator's address
         batchHistory[newBatchId].push(msg.sender);
+        priceHistory[newBatchId].push(_pricePerUnit); // Log the initial price
 
-        // Emit an event to log the creation on the blockchain
-        emit BatchCreated(newBatchId, msg.sender, _produceName);
+        emit BatchCreated(newBatchId, msg.sender, _produceName, _quantity, _pricePerUnit);
     }
 
     /**
-     * @dev Transfers a batch to a new owner.
-     * @notice Only the current owner of the batch can call this function.
+     * @dev Transfers a batch to a new owner and records the sale price.
      * @param _batchId The ID of the batch to transfer.
      * @param _newOwner The address of the new stakeholder.
+     * @param _pricePerUnit The price at which this transfer/sale is occurring.
      */
-    function transferOwnership(uint256 _batchId, address payable _newOwner) public {
-        // 1. Validation: Ensure the batch exists (owner is not the zero address).
+    function transferOwnership(uint256 _batchId, address payable _newOwner, uint256 _pricePerUnit) public {
         require(batches[_batchId].currentOwner != address(0), "Batch does not exist.");
-
-        // 2. Authorization: Ensure the person calling is the current owner.
         require(msg.sender == batches[_batchId].currentOwner, "Only the current owner can transfer.");
-
-        // 3. Validation: Ensure the new owner is not the zero address.
         require(_newOwner != address(0), "Cannot transfer to the zero address.");
 
-        // Update the current owner of the batch
         batches[_batchId].currentOwner = _newOwner;
-
-        // Add the new owner to the batch's history
         batchHistory[_batchId].push(_newOwner);
+        priceHistory[_batchId].push(_pricePerUnit); // Log the new sale price
 
-        // Emit an event to log the transfer
-        emit OwnershipTransferred(_batchId, msg.sender, _newOwner);
+        emit OwnershipTransferred(_batchId, msg.sender, _newOwner, _pricePerUnit);
     }
     
     /**
      * @dev Retrieves the full ownership history of a specific batch.
-     * This is a view function, so it doesn't cost any gas to call.
-     * @param _batchId The ID of the batch to trace.
-     * @return A memory array of addresses representing the chain of custody.
      */
     function getBatchHistory(uint256 _batchId) public view returns (address[] memory) {
         return batchHistory[_batchId];
+    }
+
+    /**
+     * @dev Retrieves the full price progression of a specific batch.
+     */
+    function getPriceHistory(uint256 _batchId) public view returns (uint256[] memory) {
+        return priceHistory[_batchId];
     }
 }
