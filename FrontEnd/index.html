@@ -6,6 +6,8 @@
     <title>KisaanVishwas - Supply Chain Tracker</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js" xintegrity="sha512-FDcVY+g7vcNsSifNf5swieyS7LqwM1CkIcpIssO/5S2NE6eRTK3T0SmyxULlLdAb1a2y2TxyrrK52yd2lMCHWA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <!-- Library for QR Code Generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.js" xintegrity="sha512-4V9gI+Hk9IeGHI3O2dMv9K4J2A+zCuAN5Nq2s9s6ZpIN3LKzQ2nNlPzhk1D/20+x1T5L+hN3QvU6K2Uv2XwA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -152,6 +154,20 @@
                         <div id="batch-details" class="bg-gray-50 dark:bg-gray-700 p-4 rounded-md text-sm mb-4"></div>
                         <h3 class="text-xl font-semibold mb-2">Price Progression / Journey</h3>
                         <div id="batch-history" class="space-y-2"></div>
+                    </div>
+                </div>
+
+                <!-- NEW: QR Code and Bill Section -->
+                <div id="qr-bill-section" class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md hidden">
+                    <h2 class="text-2xl font-bold mb-4 text-center">Produce Transparency Report</h2>
+                    <div class="border-2 border-dashed border-gray-300 dark:border-gray-600 p-4 rounded-lg">
+                        <div class="text-center mb-4">
+                            <div id="qr-code-container" class="flex justify-center"></div>
+                            <p class="text-xs text-gray-500 mt-2">Scan to verify on the blockchain</p>
+                        </div>
+                        <div id="bill-details" class="font-mono text-sm space-y-2">
+                            <!-- Bill content will be generated here by JavaScript -->
+                        </div>
                     </div>
                 </div>
 
@@ -448,7 +464,6 @@
         let signer;
         let contract;
 
-        // Hardcoded roles for the first 4 accounts from the Hardhat node
         const hardhatAccounts = [
             "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266", // Farmer (Account #0)
             "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", // Distributor (Account #1)
@@ -471,14 +486,10 @@
         const logOutput = document.getElementById('log-output');
         const loadingModal = document.getElementById('loadingModal');
         const loadingText = document.getElementById('loadingText');
-
-        // Form elements
         const createBatchForm = document.getElementById('create-batch-form');
         const transferForm = document.getElementById('transfer-form');
         const traceForm = document.getElementById('trace-form');
         const clearLogButton = document.getElementById('clear-log-button');
-
-        // Dashboard sections
         const farmerActions = document.getElementById('farmer-actions');
         const stakeholderActions = document.getElementById('stakeholder-actions');
         const traceResults = document.getElementById('trace-results');
@@ -489,7 +500,7 @@
         function log(message, type = 'info') {
             const entry = document.createElement('p');
             entry.textContent = `> ${message}`;
-            entry.className = `log-entry log-${type} p-2 rounded-md animate-fade-in`;
+            entry.className = `log-entry log-${type} p-2 rounded-md`;
             logOutput.appendChild(entry);
             logOutput.scrollTop = logOutput.scrollHeight;
         }
@@ -508,31 +519,25 @@
                 log('MetaMask is not installed!', 'error');
                 return alert('Please install MetaMask to use this application.');
             }
-
             try {
                 provider = new ethers.providers.Web3Provider(window.ethereum);
                 await provider.send("eth_requestAccounts", []);
                 signer = provider.getSigner();
                 const address = await signer.getAddress();
-                
                 if (!contractAddress.startsWith('0x') || (contractABI && contractABI.length === 0)) {
                     log('Configuration Error: Please paste the new contract address and ABI.', 'error');
                     alert('Configuration Error: Please paste the new contract address and ABI into index.html.');
                     return;
                 }
-                
                 contract = new ethers.Contract(contractAddress, contractABI, signer);
-
                 statusText.textContent = 'Connected';
                 statusText.className = 'font-semibold text-green-500';
                 accountAddress.textContent = address;
                 connectButton.textContent = 'Wallet Connected';
                 connectButton.disabled = true;
-
                 updateRoleAndUI(address);
                 log(`Wallet connected successfully: ${address}`, 'success');
                 listenForEvents();
-
             } catch (error) {
                 log(`Connection failed: ${error.message}`, 'error');
                 console.error(error);
@@ -540,12 +545,10 @@
         }
 
         function updateRoleAndUI(address) {
-            const role = ROLES[address.toLowerCase()] || 'Consumer (Anita)';
+            const role = ROLES[address.toLowerCase()] || 'Unknown User';
             accountRole.textContent = role;
-            
             farmerActions.classList.add('hidden');
             stakeholderActions.classList.add('hidden');
-
             if (role.includes('Farmer')) {
                 farmerActions.classList.remove('hidden');
             } 
@@ -556,18 +559,15 @@
         
         createBatchForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const produceName = document.getElementById('produceName').value;
-            const origin = document.getElementById('origin').value;
-            const qualityMetrics = document.getElementById('qualityMetrics').value;
-            const quantity = document.getElementById('quantity').value;
-            const pricePerUnit = document.getElementById('pricePerUnit').value;
-
+            const values = ['produceName', 'origin', 'qualityMetrics', 'quantity', 'pricePerUnit'].reduce((acc, id) => {
+                acc[id] = document.getElementById(id).value;
+                return acc;
+            }, {});
             if (!contract) return log('Please connect your wallet first.', 'error');
-            
             log('Sending transaction to create new batch...');
             showLoading('Creating new batch...');
             try {
-                const tx = await contract.createBatch(produceName, origin, qualityMetrics, quantity, pricePerUnit);
+                const tx = await contract.createBatch(...Object.values(values));
                 await tx.wait();
                 log('Transaction successful! Batch created.', 'success');
                 createBatchForm.reset();
@@ -583,9 +583,7 @@
             const batchId = document.getElementById('transferBatchId').value;
             const newOwner = document.getElementById('newOwner').value;
             const transferPrice = document.getElementById('transferPrice').value;
-
             if (!contract) return log('Please connect your wallet first.', 'error');
-
             log(`Sending transaction to transfer Batch #${batchId}...`);
             showLoading('Transferring ownership...');
             try {
@@ -603,9 +601,7 @@
         traceForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const batchId = document.getElementById('traceBatchId').value;
-
             if (!contract) return log('Please connect your wallet first.', 'error');
-
             log(`Tracing Batch #${batchId}...`);
             showLoading('Fetching batch history...');
             try {
@@ -614,14 +610,11 @@
                     contract.getBatchHistory(batchId),
                     contract.getPriceHistory(batchId)
                 ]);
-                
                 if(batchDetails.currentOwner === "0x0000000000000000000000000000000000000000") {
                     throw new Error("Batch does not exist.");
                 }
-
                 displayTraceResults(batchDetails, ownerHistory, priceHistory);
                 log(`Trace for Batch #${batchId} successful.`, 'success');
-
             } catch (error) {
                 log(`Error tracing batch: ${error.message}`, 'error');
                 traceResults.classList.add('hidden');
@@ -633,7 +626,10 @@
         function displayTraceResults(details, ownerHistory, priceHistory) {
             const batchDetailsDiv = document.getElementById('batch-details');
             const batchHistoryDiv = document.getElementById('batch-history');
-
+            const qrBillSection = document.getElementById('qr-bill-section');
+            const qrCodeContainer = document.getElementById('qr-code-container');
+            const billDetailsDiv = document.getElementById('bill-details');
+            
             batchDetailsDiv.innerHTML = `
                 <strong>Produce:</strong> ${details.produceName}<br>
                 <strong>Origin:</strong> ${details.origin}<br>
@@ -642,12 +638,10 @@
                 <strong>Current Owner:</strong> <span class="font-mono text-xs">${details.currentOwner}</span><br>
                 <strong>Created:</strong> ${new Date(details.timestamp * 1000).toLocaleString()}
             `;
-
             batchHistoryDiv.innerHTML = ownerHistory.map((owner, index) => {
                 const role = ROLES[owner.toLowerCase()] || 'Stakeholder';
                 const price = priceHistory[index] ? `sold at ₹${priceHistory[index].toString()}/kg` : 'created the batch';
                 const nextRole = ROLES[ownerHistory[index+1]?.toLowerCase()] || 'Consumer';
-
                 return `
                     <div class="flex items-center gap-4">
                         <div class="flex-shrink-0 bg-purple-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold">${index + 1}</div>
@@ -658,8 +652,42 @@
                     </div>
                 `;
             }).join('<div class="h-4 w-px bg-purple-300 dark:bg-purple-700 ml-4"></div>');
-
             traceResults.classList.remove('hidden');
+
+            const traceUrl = `${window.location.href.split('?')[0]}?batchId=${details.batchId.toString()}`;
+            qrCodeContainer.innerHTML = '';
+            try {
+                const qr = qrcode(0, 'M');
+                qr.addData(traceUrl);
+                qr.make();
+                qrCodeContainer.innerHTML = qr.createImgTag(4, 8);
+            } catch (e) {
+                console.error("QR Code generation failed:", e);
+                qrCodeContainer.innerHTML = "Could not generate QR code.";
+            }
+
+            let billHtml = `
+                <div>========================================</div>
+                <div class="text-center font-bold">${details.produceName.toUpperCase()} - BATCH #${details.batchId.toString()}</div>
+                <div>========================================</div>
+                <div><strong>Origin:</strong> ${details.origin}</div>
+                <div><strong>Quality:</strong> ${details.qualityMetrics}</div>
+                <div><strong>Quantity:</strong> ${details.quantity.toString()} kg</div>
+                <div>----------------------------------------</div>
+                <div class="font-bold">PRICE JOURNEY:</div>
+            `;
+            ownerHistory.forEach((owner, index) => {
+                if (index < ownerHistory.length - 1) {
+                    const sellerRole = ROLES[owner.toLowerCase()] || 'Stakeholder';
+                    const buyerRole = ROLES[ownerHistory[index+1].toLowerCase()] || 'Next Owner';
+                    const price = priceHistory[index + 1] ? `₹${priceHistory[index + 1].toString()}` : 'N/A';
+                    billHtml += `<div>- ${sellerRole} sold to ${buyerRole} at <strong>${price}/kg</strong></div>`;
+                }
+            });
+            billHtml += `<div>========================================</div>`;
+            billDetailsDiv.innerHTML = billHtml;
+
+            qrBillSection.classList.remove('hidden');
         }
 
         function listenForEvents() {
@@ -671,6 +699,18 @@
                 log(`EVENT: Batch #${batchId} sold to new owner for ₹${price.toString()}/kg.`, 'info');
             });
         }
+
+        window.addEventListener('load', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const batchIdFromUrl = urlParams.get('batchId');
+            if (batchIdFromUrl) {
+                log(`Batch ID #${batchIdFromUrl} detected from URL. Please connect wallet and click "Trace".`, 'info');
+                document.getElementById('traceBatchId').value = batchIdFromUrl;
+                if (contract) {
+                     document.getElementById('trace-form').requestSubmit();
+                }
+            }
+        });
     </script>
 </body>
 </html>
